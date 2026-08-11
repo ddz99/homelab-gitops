@@ -1,0 +1,45 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: uptime-kuma
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    chart: uptime-kuma
+    repoURL: https://helm.irsigler.cloud
+    targetRevision: "2.7.0"
+    helm:
+      values: |
+        ingress:
+          enabled: true
+          className: caddy
+          hosts:
+            - host: status.CHANGE_ME_DOMAIN
+              paths:
+                - path: /
+                  pathType: Prefix
+          tls:
+            - hosts:
+                - status.CHANGE_ME_DOMAIN
+        persistence:
+          enabled: true
+          size: 2Gi
+        resources:
+          requests:
+            cpu: 50m
+            memory: 128Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: uptime-kuma
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

@@ -1,0 +1,77 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: n8n
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    chart: n8n
+    repoURL: 8gears.container-registry.com/library
+    targetRevision: 2.0.1
+    helm:
+      valuesObject:
+        image:
+          tag: 2.34.4
+        ingress:
+          enabled: true
+          className: traefik
+          annotations:
+            cert-manager.io/cluster-issuer: letsencrypt-production
+            traefik.ingress.kubernetes.io/router.middlewares: n8n-n8n-https-redirect@kubernetescrd
+          hosts:
+            - host: n8n.ddzhomelab.duckdns.org
+              paths:
+                - path: /
+                  pathType: Prefix
+          tls:
+            - hosts:
+                - n8n.ddzhomelab.duckdns.org
+              secretName: n8n-tls
+        main:
+          config:
+            generic_timezone: UTC
+            node_env: production
+            tz: UTC
+            webhook_url: https://n8n.ddzhomelab.duckdns.org/
+            n8n:
+              editor_base_url: https://n8n.ddzhomelab.duckdns.org/
+              enforce_settings_file_permissions: true
+              host: n8n.ddzhomelab.duckdns.org
+              port: 5678
+              protocol: https
+              proxy_hops: 1
+          persistence:
+            enabled: true
+            type: dynamic
+            storageClass: local-path
+            size: 5Gi
+          resources:
+            requests:
+              cpu: 100m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+        extraManifests:
+          - apiVersion: traefik.io/v1alpha1
+            kind: Middleware
+            metadata:
+              name: n8n-https-redirect
+            spec:
+              redirectScheme:
+                scheme: https
+                permanent: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: n8n
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

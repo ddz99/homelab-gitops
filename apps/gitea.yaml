@@ -1,0 +1,63 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: gitea
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    chart: gitea
+    repoURL: https://dl.gitea.com/charts
+    targetRevision: "11.0.0"
+    helm:
+      values: |
+        ingress:
+          enabled: true
+          className: caddy
+          hosts:
+            - host: git.CHANGE_ME_DOMAIN
+              paths:
+                - path: /
+                  pathType: Prefix
+          tls:
+            - hosts:
+                - git.CHANGE_ME_DOMAIN
+        gitea:
+          admin:
+            username: devops
+            existingSecret: gitea-admin-secret
+          config:
+            server:
+              DOMAIN: git.CHANGE_ME_DOMAIN
+              ROOT_URL: https://git.CHANGE_ME_DOMAIN
+        postgresql:
+          enabled: false
+        postgresql-ha:
+          enabled: false
+        mariadb:
+          enabled: false
+        memcached:
+          enabled: false
+        redis:
+          enabled: false
+        persistence:
+          enabled: true
+          size: 5Gi
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: gitea
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
