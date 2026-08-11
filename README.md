@@ -13,11 +13,16 @@ Git push
 Argo CD: homelab
    |-- cert-manager Application
    |      `-- Let's Encrypt ClusterIssuer
-   `-- n8n Application
-          |-- n8n Helm chart
-          |-- PersistentVolumeClaim
+   |-- n8n Application
+   |      |-- n8n Helm chart
+   |      |-- PersistentVolumeClaim
+   |      |-- Traefik Ingress
+   |      `-- HTTPS redirect middleware
+   `-- homepage Application
+          |-- Homepage Helm chart (dashboard)
+          |-- RBAC for ingress auto-discovery
           |-- Traefik Ingress
-          `-- HTTPS redirect middleware
+          `-- HTTPS redirect middleware (manifests/homepage)
 ```
 
 Infrastructure provisioning, K3s, Argo CD installation, and DuckDNS updates live in the separate [`homelab-hetzner`](https://github.com/ddz99/homelab-hetzner) repository.
@@ -29,6 +34,8 @@ Infrastructure provisioning, K3s, Argo CD installation, and DuckDNS updates live
 | `bootstrap.yaml` | Bootstrap | Root Argo CD Application |
 | `apps/cert-manager.yaml` | Active | cert-manager and the production Let's Encrypt issuer |
 | `apps/n8n.yaml` | Active | Public n8n deployment |
+| `apps/homepage.yaml` | Active | Public Homepage dashboard with ingress auto-discovery |
+| `manifests/homepage/` | Active | Raw manifests rendered by the homepage Application (Traefik middleware) |
 | `apps/caddy-ingress.yaml` | Inactive template | Caddy ingress controller example |
 | `apps/gitea.yaml` | Inactive template | Gitea example with placeholder values |
 | `apps/uptime-kuma.yaml` | Inactive template | Uptime Kuma example with placeholder values |
@@ -36,7 +43,7 @@ Infrastructure provisioning, K3s, Argo CD installation, and DuckDNS updates live
 The active set is controlled by `spec.source.directory.include` in `bootstrap.yaml`:
 
 ```yaml
-include: "{cert-manager.yaml,n8n.yaml}"
+include: "{cert-manager.yaml,n8n.yaml,homepage.yaml}"
 ```
 
 ## Prerequisites
@@ -70,6 +77,7 @@ Expected active Applications:
 homelab
 cert-manager
 n8n
+homepage
 ```
 
 ## Deployment Workflow
@@ -114,6 +122,47 @@ curl --fail --show-error --head \
 ```
 
 Complete n8n's owner-account setup immediately after first deployment. The setup page is publicly reachable.
+
+## Homepage
+
+Homepage is deployed from the community `jameswynn` Helm chart:
+
+- Chart version: `2.1.0`
+- Homepage image: `v1.13.2` (pinned; the chart default is stale)
+- Namespace: `homepage`
+- Public URL: <https://home.ddzhomelab.duckdns.org>
+- Ingress: Traefik with HTTP-to-HTTPS redirect
+- TLS: cert-manager with Let's Encrypt HTTP-01 validation
+
+The dashboard is public and unauthenticated by design. It shows cluster and
+node CPU/memory widgets, a bookmarks group with homelab links, and service
+tiles discovered from Kubernetes Ingress annotations cluster-wide.
+
+The Application uses two Argo CD sources: the Helm chart, and
+`manifests/homepage/` in this repository, which holds the Traefik
+HTTPS-redirect middleware (the chart cannot render extra manifests).
+
+To add a service tile for any app, annotate its Ingress:
+
+```yaml
+gethomepage.dev/enabled: "true"
+gethomepage.dev/name: My App
+gethomepage.dev/group: Some Group
+gethomepage.dev/icon: myapp.svg
+gethomepage.dev/description: What it does
+```
+
+The n8n Ingress carries these annotations and appears under "Automation".
+
+Verify Homepage:
+
+```bash
+ssh devops@ddzhomelab.duckdns.org \
+  'kubectl get pods,ingress,middleware --namespace homepage'
+
+curl --fail --show-error --head \
+  https://home.ddzhomelab.duckdns.org
+```
 
 ## TLS
 

@@ -1,0 +1,98 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: homepage
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  sources:
+    - chart: homepage
+      repoURL: https://jameswynn.github.io/helm-charts
+      targetRevision: 2.1.0
+      helm:
+        valuesObject:
+          image:
+            tag: v1.13.2
+          enableRbac: true
+          serviceAccount:
+            name: homepage
+            create: true
+          env:
+            - name: HOMEPAGE_ALLOWED_HOSTS
+              value: home.ddzhomelab.duckdns.org
+          config:
+            bookmarks:
+              - Homelab:
+                  - GitOps repo:
+                      - abbr: GO
+                        href: https://github.com/ddz99/homelab-gitops
+                  - Infrastructure repo:
+                      - abbr: HZ
+                        href: https://github.com/ddz99/homelab-hetzner
+                  - Hetzner console:
+                      - abbr: HC
+                        href: https://console.hetzner.cloud/
+                  - DuckDNS:
+                      - abbr: DD
+                        href: https://www.duckdns.org/
+            services: []
+            widgets:
+              - kubernetes:
+                  cluster:
+                    show: true
+                    cpu: true
+                    memory: true
+                    showLabel: true
+                    label: k3s
+                  nodes:
+                    show: true
+                    cpu: true
+                    memory: true
+                    showLabel: true
+              - search:
+                  provider: duckduckgo
+                  target: _blank
+            kubernetes:
+              mode: cluster
+            settingsString: |
+              title: DDZ Homelab
+              headerStyle: boxed
+          ingress:
+            main:
+              enabled: true
+              ingressClassName: traefik
+              annotations:
+                cert-manager.io/cluster-issuer: letsencrypt-production
+                traefik.ingress.kubernetes.io/router.middlewares: homepage-homepage-https-redirect@kubernetescrd
+              hosts:
+                - host: home.ddzhomelab.duckdns.org
+                  paths:
+                    - path: /
+                      pathType: Prefix
+              tls:
+                - hosts:
+                    - home.ddzhomelab.duckdns.org
+                  secretName: homepage-tls
+          resources:
+            requests:
+              cpu: 10m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+    - repoURL: https://github.com/ddz99/homelab-gitops.git
+      targetRevision: main
+      path: manifests/homepage
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: homepage
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

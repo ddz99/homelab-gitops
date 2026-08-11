@@ -23,6 +23,11 @@ spec:
           annotations:
             cert-manager.io/cluster-issuer: letsencrypt-production
             traefik.ingress.kubernetes.io/router.middlewares: n8n-n8n-https-redirect@kubernetescrd
+            gethomepage.dev/enabled: "true"
+            gethomepage.dev/name: n8n
+            gethomepage.dev/group: Automation
+            gethomepage.dev/icon: n8n.svg
+            gethomepage.dev/description: Workflow automation
           hosts:
             - host: n8n.ddzhomelab.duckdns.org
               paths:
